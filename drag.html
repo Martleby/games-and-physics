@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>Document</title>
+</head>
+<body class="h-dvh w-full">
+
+    <div class="h-full w-full relative" x-data="drag"  @mouseup="dragEnd" @mousemove.document="dragMe" @mouseleave="draggedItem=null">
+
+        <div id="twonk"  @mousedown.self="dragStart"  
+            :class="draggedItem ? 'pointer-events-none' : ''"
+            class="z-10 absolute  w-48 h-64 p-2 rounded-lg bg-green-500 active:bg-green-500 select-none">
+            
+            <div class="bg-white h-full w-full rounded-lg pointer-events-none bg-cover bg-[url(/img/1.jpeg)]">
+
+            </div>
+
+        </div>
+
+         <div id="mah" @mousedown.self="dragStart"  
+         :class="draggedItem ? 'pointer-events-none' : ''"
+            class="z-15 absolute  w-48 h-64 p-2 rounded-lg bg-red-500 select-none">
+            
+            <div class="bg-white h-full w-full rounded-lg pointer-events-none bg-cover bg-[url(/img/1.jpeg)]">
+
+            </div>
+
+        </div>
+
+        <div draggable="false" id="mah20"  @mousedown.self="dragStart"  
+            :class="draggedItem ? 'pointer-events-none' : ''"
+            class="z-20 absolute  w-48 h-64 p-2 rounded-lg bg-purple-500  select-none">
+            
+            <div class="bg-white h-full w-full rounded-lg pointer-events-none bg-cover bg-[url(/img/1.jpeg)]">
+
+            </div>
+
+        </div>
+
+        <button x-ref="dropZone" class="size-96 absolute bottom-0 right-0 z-5"
+            
+            @mouseenter="if(draggedItem) hovering=true;"
+            @mouseup="drop"
+            @mouseleave="hovering=false"
+            
+            :class="hovering ? 'bg-sky-400' : 'bg-lime-700'"
+        
+        >
+
+
+        </button>
+
+  
+    </div>
+
+
+    
+
+
+
+    <script>
+        document.addEventListener('alpine:init', () =>{
+
+            Alpine.data('drag', () => ({
+
+                draggedItem: null,
+                droppedItem: null,
+                dx: null,
+                dy: null,
+                nx: 0,
+                ny: 0,
+                dragging: false,
+                hovering: false,
+                run: true,
+
+                init(){
+
+
+                    this.$nextTick(() => this.animate())
+
+                },
+
+     
+                dragStart(e){
+
+                    this.dragging = true
+                    this.draggedItem = e.currentTarget;
+                    const rect = this.draggedItem.getBoundingClientRect();
+                    
+                    this.dx = rect.width / 2;
+                    this.dy = rect.height / 2;
+
+                    // Where the card is RIGHT NOW
+                    this.currentX = rect.left;
+                    this.currentY = rect.top;
+                    
+                    // Where the card WANTS to be (the mouse)
+                    this.targetX = e.clientX - this.dx;
+                    this.targetY = e.clientY - this.dy;
+
+                    this.draggedItem.style.left = '0px';
+                    this.draggedItem.style.top = '0px';
+                    this.draggedItem.style.transition = 'none';
+
+                    // Start the "Chase" loop
+                    //this.animate();
+                },
+
+                dragMe(e) {
+
+                    //e.preventDefault()
+                    if (!this.draggedItem || !this.dragging) return;
+                    this.targetX = e.clientX - this.dx;
+                    this.targetY = e.clientY - this.dy;
+
+                },
+
+                animate() {
+                    
+                    //console.log('running')
+                    
+                    if (!this.draggedItem && !this.dragging) {
+                        requestAnimationFrame(() => this.animate())
+                        return
+                    };
+
+                    // The "Magic" Formula: Move 20% of the distance to the target every frame
+                    // This creates a smooth "snap" that slows down as it gets closer
+                    this.currentX += (this.targetX - this.currentX) * 0.2;
+                    this.currentY += (this.targetY - this.currentY) * 0.2;
+
+                    //console.log(this.targetX)
+
+                    this.draggedItem.style.transform = `translate(${this.currentX}px, ${this.currentY}px) scale(1.05)`;
+
+                    // Keep the loop going as long as we are dragging
+                    requestAnimationFrame(() => this.animate());
+                },
+
+                dragEnd(e){
+
+                    this.dragging = false
+                    if (!this.draggedItem) return;
+    
+                    if(this.hovering){
+                        const zoneRect = this.$refs.dropZone.getBoundingClientRect()
+                        this.targetX = zoneRect.left + (zoneRect.width / 2) - (this.draggedItem.offsetWidth / 2);
+                        this.targetY = zoneRect.top + (zoneRect.height / 2) - (this.draggedItem.offsetHeight / 2);
+
+                        setTimeout(() => {
+                            // Final "bake"
+                            this.draggedItem.style.left = this.currentX + 'px';
+                            this.draggedItem.style.top = this.currentY + 'px';
+                            this.draggedItem.style.transform = 'none';
+                            this.draggedItem = null
+                            this.hovering = false
+                        }, 300)
+                    }else{
+
+                        this.draggedItem = null
+                    }
+                    
+                    
+                },
+
+                drop(){
+
+                    if(!this.droppedItem) return
+
+
+
+
+                }
+
+            }))
+
+
+        })
+    </script>
+    
+</body>
+</html>

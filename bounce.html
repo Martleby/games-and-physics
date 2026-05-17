@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>Bounce</title>
+</head>
+<body class="h-dvh w-full">
+
+    <div x-ref="mah" x-data="bounce" class="h-full w-full bg-zinc-100 flex items-center justify-center relative">
+
+        <div x-ref="ball" class="absolute z-10 size-20 bg-sky-500 rounded-full flex items-center justify-center text-white text-5xl" 
+            :style="`top: ${startTop}px; 
+                    left: ${startLeft}px; 
+                    transform-origin: bottom center; 
+                    transform: translate(${xPos}px, ${position}px) scaleX(${scaleX}) scaleY(${scaleY})`">
+
+                    <div :style="`transform: rotate(${rotation}deg)`">
+                        1
+                    </div>
+                    
+
+        </div>
+
+    </div>
+
+    <script>
+
+        document.addEventListener('alpine:init', () => {
+
+            Alpine.data('bounce', () => ({
+
+                startTop: 0,
+                startLeft: 0,
+                gravity: 1.6,
+                velocity: 0,
+                position: 0,
+                floor: 0,
+                rightWall: 0,
+                leftWall: 0,
+                bounce: -0.9,
+                xPos: 20,
+                xSpeed: 8,
+                scaleX: 1,
+                scaleY: 1,
+                rotation: 0,
+                rotationAmount: 5,
+                stop: false,
+                time: null,
+
+
+                init(){
+
+                    let rect = this.$refs.mah.getBoundingClientRect()
+                    let ball = this.$refs.ball.getBoundingClientRect()
+                    this.floor = rect.height - ball.width - this.startTop
+                    this.rightWall = rect.width - ball.width - this.startLeft
+                    this.leftWall = rect.left - this.startLeft
+                    this.animate()
+
+                },
+
+                animate(){
+
+            
+                    this.velocity += this.gravity
+                    this.position += this.velocity
+                    this.xPos += this.xSpeed
+
+                             
+                    if((this.position) >= this.floor) {
+
+                        this.position = this.floor
+                        this.velocity *= this.bounce
+
+                        if(Math.abs(this.velocity) < 1){
+                            this.velocity = 0
+                            this.stop = true
+                        }
+
+                        this.xSpeed *= 0.95
+
+                    }
+
+                    if(this.xPos >= this.rightWall){
+                        this.xPos = this.rightWall
+                        this.xSpeed *= -1
+                        this.rotationAmount *= -1
+                    }
+
+                    if(this.xPos <= this.leftWall){
+                        this.xPos = this.leftWall 
+                        this.xSpeed *= -1
+                        this.rotationAmount *= -1
+                    }
+
+                    if(!this.velocity == 0){
+                        this.rotation += this.rotationAmount
+                    }
+
+                    //After the stop condition, allow 10 frames of roll
+                    if(this.stop){
+                        if(!this.time) this.time = Date.now()
+
+                        if(Date.now() - this.time >= 600){
+                            return
+                        }
+
+
+                    }
+                
+                    requestAnimationFrame(() => this.animate())
+
+
+                }
+
+
+            }))
+
+        })
+
+
+    </script>
+    
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>Pong</title>
+</head>
+<body class="h-dvh w-full overflow-hidden bg-zinc-900 p-6">
+    
+    <div x-cloak x-ref="court" x-data="pong" 
+        class="h-full w-full border-2 border-lime-500 relative">
+
+        <div class="absolute left-96 text-lime-500 text-7xl" x-text="playerOneScore">
+
+        </div>
+
+        <div class="absolute right-96 text-lime-500 text-7xl" x-text="playerTwoScore">
+
+        </div>
+
+        <div x-ref="leftPaddle" class="absolute w-8 h-36 bg-lime-500 left-2"
+            :style="`transform: translateY(${leftPaddleY}px)`"
+        >
+
+        </div>
+
+        <div x-ref="ball" class="absolute size-6 bg-lime-500 rounded-full"
+            :style="`transform: translate(${ballX}px, ${ballY}px)`"
+        >
+
+        </div>
+
+        <div x-ref="rightPaddle" class="absolute w-8 h-36 bg-lime-500 right-2"
+            :style="`transform: translateY(${rightPaddleY}px)`"
+        >
+
+        </div>
+
+        <div x-show="pause" class="w-fit h-fit text-7xl text-lime-500 bg-zinc-900 mx-auto my-auto absolute inset-0 animate-pulse">
+            Paused
+        </div>
+
+    </div>
+
+    <script>
+
+        document.addEventListener('alpine:init', () => {
+
+            Alpine.data('pong', () => ({
+
+                courtLeft: 0,
+                courtTop: 0,
+                courtRight: 0,
+                courtBottom: 0,
+                leftPaddleY: 0,
+                leftPaddleFace: 0,
+                rightPaddleY: 0,
+                rightPaddleFace: 0,
+                leftPaddleSpeed: 13,
+                rightPaddleSpeed: 20,
+                ballX: 200,
+                ballY: 0,
+                ballSpeedX: 15,
+                ballSpeedY: 15,
+                spinAmount: 1.5,
+                keys: {},
+                pause: false,
+                pausing: false,
+                gameTicks: 0,
+                playerOneScore: 0,
+                playerTwoScore: 0,
+
+                init(){
+
+                    let court = this.$refs.court.getBoundingClientRect()
+                    let ball = this.$refs.ball.getBoundingClientRect()
+                    let leftPaddle = this.$refs.leftPaddle.getBoundingClientRect()
+                    let rightPaddle = this.$refs.rightPaddle.getBoundingClientRect()
+
+                    this.courtLeft = court.left - ball.width
+                    this.courtTop = court.top - ball.height
+                    this.courtRight = court.right - ball.width * 2
+                    this.courtBottom = court.bottom - ball.height *2
+
+                    this.leftPaddleFace = leftPaddle.left + leftPaddle.width - ball.width
+                    this.rightPaddleFace = rightPaddle.left - ball.width * 2
+
+                    window.addEventListener("keydown", e => {
+                        this.keys[e.code] = true
+                    })
+
+                    window.addEventListener("keyup", e => {
+                        this.keys[e.code] = false
+                    })
+
+                    this.animate()
+
+                },
+
+                animate(){
+
+                    this.gameTicks += 1
+
+                    if (this.keys["KeyP"]) {
+                        if(this.pausing) {
+                            requestAnimationFrame(() => this.animate())
+                            return
+                        }
+
+                        this.pausing = true
+                        this.pause = !this.pause
+                        
+                        setTimeout(() => this.pausing = false, 200)
+                          
+                    }
+
+                    if(this.pause){
+                        requestAnimationFrame(() => this.animate())
+                        return
+                    }
+
+
+                    if (this.keys["KeyA"]) {
+                        this.leftPaddleY -= this.leftPaddleSpeed
+                    }
+
+                    if (this.keys["KeyZ"]) {
+                        this.leftPaddleY += this.leftPaddleSpeed
+                    }
+
+                    if (this.keys["Quote"]) {
+                        this.rightPaddleY -= this.rightPaddleSpeed
+                    }
+
+                    if (this.keys["Slash"]) {
+                        this.rightPaddleY += this.rightPaddleSpeed
+                    }
+
+
+                    //This won't work due to negative ball speeds
+                    // this.ballSpeedX = Math.max(this.minBallSpeedX, this.ballSpeedX * 0.99)
+                    // this.ballSpeedY = Math.max(this.minBallSpeedY, this.ballSpeedY * 0.99)
+                    
+
+                    this.ballX += this.ballSpeedX
+                    this.ballY += this.ballSpeedY
+
+                    if(this.ballX <= this.courtLeft){
+                        this.ballX = this.courtLeft
+                        this.ballSpeedX = -15
+                        this.ballSpeedX *= -1
+                        this.playerTwoScore += 1
+                    }
+
+                    if(this.ballX >= this.courtRight){
+                        this.ballX = this.courtRight
+                        this.ballSpeedX = 15
+                        this.ballSpeedX *= -1
+                        this.playerOneScore += 1
+                    }
+
+                    if(this.ballY <= this.courtTop){
+                        this.ballY = this.courtTop
+                        //this.ballSpeedY -= 1.8 //this.spinAmount
+                        this.ballSpeedY *= -1
+                    }
+
+                    if(this.ballY >= this.courtBottom){
+                        this.ballY = this.courtBottom
+                        //this.ballSpeedY += 1.6 //this.spinAmount
+                        this.ballSpeedY *= -1
+                    }
+
+                    if(this.ballX <= this.leftPaddleFace 
+                        && !(this.ballY + 24 < this.leftPaddleY || this.ballY > (this.leftPaddleY + 144))){
+                            this.ballX = this.leftPaddleFace
+                            this.ballSpeedX -= 15 
+                            this.ballSpeedX *= -1
+                    }
+
+                    if(this.ballX >= this.rightPaddleFace 
+                        && !(this.ballY + (24) < this.rightPaddleY || this.ballY > (this.rightPaddleY + 144))){
+                            this.ballX = this.rightPaddleFace
+                            this.ballSpeedX += this.spinAmount 
+                            this.ballSpeedX *= -1
+                    }
+
+
+                    if (this.ballX > this.courtRight * 0.8  && this.ballSpeedX > 0) {
+
+                        const target = this.rightPaddleY + 144 /2
+                        const diff = this.ballY - target
+
+                        if (Math.abs(diff) > 60) {   // AI won't react unless ball is far enough
+                            this.rightPaddleY += Math.sign(diff) * this.rightPaddleSpeed
+                        }
+
+                        // if (this.ballY < target) {
+                        //     this.rightPaddleY -= this.rightPaddleSpeed
+                        // }
+
+                        // if (this.ballY > target) {
+                        //     this.rightPaddleY += this.rightPaddleSpeed
+                        // }
+                    }
+
+                    if (this.ballX < this.courtRight * 0.75 && this.ballSpeedX < 0) {
+
+                        const target = this.leftPaddleY + 144 /2
+                        
+                        if (this.ballY < target) {
+                            this.leftPaddleY -= this.leftPaddleSpeed
+                        }
+
+                        if (this.ballY > target) {
+                            this.leftPaddleY += this.leftPaddleSpeed
+                        }
+                    }
+
+
+                    
+
+                    
+                    if(this.gameTicks == 60) this.gameTicks = 0
+
+                    requestAnimationFrame(() => this.animate())
+
+                }
+
+
+            }))
+
+        })
+
+
+    </script>
+
+</body>
+</html>

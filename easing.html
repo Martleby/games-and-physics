@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>Easing</title>
+</head>
+<body class="h-dvh w-full">
+
+    <div x-data="ease" class="h-full w-full bg-zinc-100 flex items-center justify-center relative">
+
+    <div class="bg-white p-4 flex group/named flex-col gap-y-6">
+
+        <template x-for="f in funcs">
+
+            <div class="relative h-10">
+
+                <div x-text="f">
+                </div>
+
+                <div class="w-96 border-b-2 mt-2"></div>
+
+                <div class="size-4 rounded-full bg-red-500 absolute -mt-2 
+                    transition-transform duration-700 group-hover/named:bg-green-500
+                    group-hover/named:translate-x-96"
+                    :class="f"
+                    >
+
+                </div>
+
+        </template>
+
+    </div>
+
+    </div>
+
+
+
+
+    <script>
+
+        document.addEventListener('alpine:init', () => {
+
+            Alpine.data('ease', () => ({
+
+                funcs: ['ease-linear', 'ease-in', 'ease-out', 'ease-in-out'],
+              
+            }))
+
+        })
+
+
+    </script>
+    
+</body>
+</html>

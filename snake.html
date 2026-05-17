@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <title>Snake</title>
+</head>
+<body class="h-dvh w-full p-6 grid grid-cols-[1fr_auto_1fr] bg-cover bg-[url(/img/jungle.png)]">
+
+    <div class="">
+
+       
+
+    </div>
+
+    <div class="flex flex-col h-full">
+        <div class="mb-16 mt-10 mx-auto">
+            <img class="w-96 place-self-start" src="/img/snake.png">
+        </div>
+
+        <div x-data="snake">
+
+            <div class="relative">
+                <canvas x-ref="canvas" width="600" height="400" class="border">
+
+                </canvas>
+
+                <div x-show="state == 'start'" class="absolute inset-0 flex items-center justify-center text-4xl bg-black text-white">
+                    <div>
+                        Press S to start
+                    </div>
+                </div>
+
+                <div x-show="state == 'gameover'" class="absolute inset-0 flex flex-col items-center justify-center text-4xl bg-black text-white">
+                    
+                    <div class="text-6xl mb-4">
+                        Game Over
+                    </div>
+                    <div>
+                        Press S to start
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 text-white text-3xl text-center font-bold" x-text="`Score: ${score}`">
+
+
+            </div>
+
+        </div>
+    </div>
+
+    <div>
+
+    </div>
+
+
+    <script>
+
+        document.addEventListener('alpine:init', () =>{
+
+            Alpine.data('snake', () => ({
+
+                canvas: null,
+                ctx: null,
+                snake: null,
+                fruit: null,
+                direction: null,
+                nextDirection: null,
+                keys: {},
+                canTogglePause: true,
+                lastTime: null,
+                accumulator: null,
+                step: null,
+                states: ['start', 'playing', 'gameover', 'paused'],
+                state: 'start',
+                occupancy: null,
+                score: null,
+                directionLocked: false,
+                previousSnake: null,
+                alpha: 0,
+
+
+
+                init(){
+
+                    this.canvas = this.$refs.canvas
+                    this.ctx = this.canvas.getContext('2d')
+
+                    window.addEventListener("keydown", e => {
+                        this.keys[e.code] = true
+                    })
+
+                    window.addEventListener("keyup", e => {
+                        this.keys[e.code] = false
+                    })
+
+                    this.initGame()                   
+
+                    this.tick()
+                    
+                },
+
+                initGame(){
+
+                    this.snake = [
+                        {x: 5, y: 5},
+                        {x: 4, y: 5},
+                        {x: 3, y: 5}
+                    ]
+
+                    this.fruit = {x: 10, y: 10}
+
+                    this.direction = {x: 1, y: 0}
+
+                    this.nextDirection = {x: 1, y: 0}
+
+                    this.accumulator = 0
+
+                    this.step = 120
+
+                    this.occupancy = new Set(
+                        this.snake.map(s => `${s.x},${s.y}`)
+                    );
+
+                    this.createFruit()
+
+                    this.score = 0
+
+
+                },
+
+                tick(){
+
+                    this.readKeys()
+
+                    if(this.state == 'gameover'){
+                        requestAnimationFrame(() => this.tick())
+                        return
+                    }
+
+                    if(this.state == 'paused'){
+                        requestAnimationFrame(() => this.tick())
+                        return
+                    }
+
+                    if(this.state == 'start'){
+                        requestAnimationFrame(() => this.tick())
+                        return
+                    }
+
+                    if(this.calculateUpdateTime() >= this.step){
+                        this.updateSnake()
+                        this.accumulator = 0
+                    }
+                    
+                    this.render()
+
+                    
+                    requestAnimationFrame(() => this.tick())
+
+                },
+
+                calculateUpdateTime(){
+
+                    if(!this.lastTime) this.lastTime = Date.now()
+
+                    const now = Date.now()
+                    const delta = now - this.lastTime
+                    
+                    this.accumulator += delta
+                    this.lastTime = now
+
+                    this.alpha = Math.min(this.accumulator / this.step, 1)
+
+                    return this.accumulator
+
+                },
+
+                readKeys(){
+
+                    if(this.keys['KeyP']){
+
+                        if(this.canTogglePause){
+
+                            this.state == 'paused' ? this.state = 'running' : this.state = 'paused' 
+                            this.canTogglePause = false
+                            setTimeout(() => this.canTogglePause = true, 250)
+
+                        }
+                    }
+
+                    if(this.keys['KeyS']){
+                        if(this.state == 'gameover' || this.state == 'start'){
+                            this.initGame()
+                            this.state = 'running'
+                        }
+                    }
+
+
+                    const trySetDirection = (dx, dy) => {
+                        // Prevent multiple turns per tick
+                        if (this.directionLocked) return;
+
+                        // Prevent 180° reversals (compare with nextDirection!)
+                        if (dx === -this.nextDirection.x && dy === -this.nextDirection.y) return;
+
+                        this.nextDirection = { x: dx, y: dy };
+                        this.directionLocked = true;
+                    };
+
+                    if (this.keys['ArrowDown'])  trySetDirection(0, 1);
+                    if (this.keys['ArrowUp'])    trySetDirection(0, -1);
+                    if (this.keys['ArrowLeft'])  trySetDirection(-1, 0);
+                    if (this.keys['ArrowRight']) trySetDirection(1, 0);
+
+                },
+
+                updateSnake(){
+
+                    this.direction = this.nextDirection
+
+                    const head = this.snake[0]
+                    const newHead = {x: head.x + this.direction.x, y: head.y + this.direction.y}   
+                    this.snake.unshift(newHead)
+
+                    if(this.occupancy.has(`${newHead.x},${newHead.y}`)){
+                        this.state = 'gameover'
+                    }
+
+                    this.occupancy.add(`${newHead.x},${newHead.y}`)
+
+                    if(newHead.x == this.fruit.x && newHead.y == this.fruit.y){
+                        this.createFruit()
+                        this.score += 5
+                        if(this.score % 100 == 0){
+                            this.step -= 5
+                        }
+                    }else{
+                        const tail = this.snake.pop();
+                        this.occupancy.delete(`${tail.x},${tail.y}`);
+                    }
+
+                    //Wall collision detection
+                    if(newHead.x < 0 || newHead.x > 29){
+                        this.state = 'gameover'
+                    }
+                    
+                    if(newHead.y < 0 || newHead.y > 19){
+                        this.state = 'gameover'
+                    }
+
+                    this.directionLocked = false
+
+
+                },
+
+                createFruit(){
+                    do{
+                        this.fruit.x = Math.floor(Math.random() * 30)
+                        this.fruit.y = Math.floor(Math.random() * 20)
+                    }
+                        while(this.occupancy.has(`${this.fruit.x},${this.fruit.y}`))
+                },
+
+                render(){
+
+                    this.ctx.clearRect(0, 0, 600, 400)
+
+                    this.ctx.fillStyle = 'black'
+                    this.ctx.fillRect(0, 0, 600, 400)
+
+
+
+                    //draw grid
+                    for(i = 20; i < 600; i += 20){
+                        this.ctx.beginPath()
+                        this.ctx.lineWidth = 0.25
+                        this.ctx.moveTo(i, 0)
+                        this.ctx.strokeStyle = 'silver'
+                        this.ctx.lineTo(i, 400)
+                        this.ctx.stroke()
+                        this.ctx.closePath()
+                    }
+
+                    for(i = 20; i < 400; i += 20){
+                        this.ctx.beginPath()
+                        this.ctx.moveTo(0, i)
+                        this.ctx.strokeStyle = 'silver'
+                        this.ctx.lineTo(600, i)
+                        this.ctx.stroke()
+                        this.ctx.closePath()
+                    }
+                    
+                    
+                    
+                    this.ctx.fillStyle = 'yellowgreen'
+                    this.ctx.strokeStyle = 'darkgreen'
+
+                    for(i = this.snake.length - 1; i >= 0; i--){
+                        const seg = this.snake[i]
+
+                        this.ctx.fillStyle = i == 0 ? 'darkgreen' : 'yellowgreen'
+
+                        this.ctx.fillRect(seg.x * 20 , seg.y * 20, 20, 20)
+                        this.ctx.strokeRect(seg.x * 20, seg.y * 20, 20, 20)
+                    }
+
+                    this.ctx.beginPath()
+                    this.ctx.fillStyle = 'red'
+                    this.ctx.arc(this.fruit.x * 20 + 10, this.fruit.y * 20 + 10, 10, 0, 2 * Math.PI)
+                    this.ctx.fill()
+                    this.ctx.closePath()
+
+                    // //bottom right
+                    // this.ctx.beginPath()
+                    // this.ctx.fillStyle = 'skyblue'
+                    // this.ctx.moveTo(100, 100)
+                    // this.ctx.arc(100, 100, 20, 0, 0.5 *  Math.PI)
+                    // this.ctx.closePath()
+                    // this.ctx.fill()
+
+                    // //top right
+                    // this.ctx.beginPath()
+                    // this.ctx.fillStyle = 'skyblue'
+                    // this.ctx.moveTo(320, 120)
+                    // this.ctx.arc(320, 120, 20, -0.5 * Math.PI, 0)
+                    // this.ctx.fill()
+                    // this.ctx.lineWidth = 1
+                    // this.ctx.strokeStyle = 'black'
+                    // this.ctx.closePath()
+                    // this.ctx.stroke()
+                    
+
+                    // //top left
+                    // this.ctx.beginPath()
+                    // this.ctx.fillStyle = 'skyblue'
+                    // this.ctx.moveTo(220, 220)
+                    // this.ctx.arc(220, 220, 20, Math.PI, 1.5 *  Math.PI)
+                    // this.ctx.closePath()
+                    // this.ctx.fill()
+
+                    // //bottom left
+                    // this.ctx.beginPath()
+                    // this.ctx.fillStyle = 'skyblue'
+                    // this.ctx.moveTo(300, 300)
+                    // this.ctx.arc(300, 300, 20, 0.5 * Math.PI, Math.PI)
+                    // this.ctx.closePath()
+                    // this.ctx.fill()
+
+                }
+
+            }))
+
+        })
+
+
+    </script>
+    
+</body>
+</html>

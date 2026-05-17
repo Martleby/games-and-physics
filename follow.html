@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>Follow</title>
+</head>
+<body class="h-dvh w-full bg-zinc-900 text-white relative">
+
+    <div x-data="follow" class="h-full w-full relative overflow-hidden" @keyup.enter.window="setStarburst" @mousemove="updateLocation">
+
+        <template x-for="block in blocks" :key="block.id">
+            <div :style="`transform: translate(${block.x}px, ${block.y}px) scale(${scaleAmount})`"
+                class="absolute text-4xl flex items-center justify-center"
+                
+                :class="block.letter == ' ' ? 'size-6 rounded-full' : 'size-8'"
+                x-text="block.letter"
+            >
+
+            </div>
+
+        </template>
+
+    </div>
+
+
+    <script>
+
+        document.addEventListener('alpine:init', () => {
+
+            Alpine.data('follow', () => ({
+
+                targetX: 0,
+                targetY: 0,
+                text: 'martin leonard hughes '.toUpperCase(),
+                starburst: false,
+                lastMove: Date.now(),
+                blocks: [],
+                burstSpeed: 1.05,
+                scaleAmount: 1.0,
+                globalRotation: -0.01,
+                angleStep: 0,
+                state: 'moving', // moving, orbitting, collapsging, bursting
+
+                init(){
+
+                    this.angleStep = (Math.PI * 2) / this.text.length;
+
+                    Array.from(this.text).forEach((c, index) => {
+
+                        this.blocks.push({
+                            id: index,
+                            x: 0,
+                            y: 0,
+                            letter: c,
+                            step: 0.3 / ((index + 1)  * 0.5),
+                            angle: index * this.angleStep,
+                            radius: 0,
+                        })
+
+                    })
+
+                    this.animate()
+
+                },
+
+                animate(){
+
+                    const isIdle = Date.now() - this.lastMove > 500; // Idle after 100ms
+                    if(isIdle && this.state == 'moving'){
+                        this.state = 'orbiting'
+                    }
+
+                    let now = Date.now()
+
+
+                    this.blocks.forEach((item, index) => {
+
+                        let destinationX = this.targetX;
+                        let destinationY = this.targetY;
+
+                        let step = item.step
+                        item.angle -= this.globalRotation
+
+                        //orbiting
+                        if(this.state == 'orbiting'){
+
+                            const timeIdling = (now - (this.lastMove + 500)) / 1000;
+
+                            item.radius += 2
+                            step = 0.20
+
+                            const breath = Math.sin(Date.now() / 750)
+                            const breathing = item.radius + breath * 30;
+                            //this.scaleAmount = Math.abs(breath * 1.25)
+
+                            if(item.radius >= 200) item.radius = 200
+
+                            destinationX += Math.cos(item.angle) * breathing
+                            destinationY += Math.sin(item.angle) * breathing
+
+                            // trigger collapse after idle
+                            if (isIdle && now - this.lastMove > 500) {
+                                //this.state = 'collapsing'
+                            }
+                        }
+
+                        //collapsing
+                        if(this.state == 'collapsing'){
+                            //item.angle += 0.015
+                            item.radius *= 0.82   // shrink toward centre
+                            step = 0.20
+
+                            if (item.radius < 10) {
+                                item.radius = 10
+                                this.state = 'bursting'
+                                this.burstStart = now
+                            }
+
+                            destinationX += Math.cos(item.angle) * item.radius
+                            destinationY += Math.sin(item.angle) * item.radius
+                        }
+
+                        //bursting
+                        if (this.state === 'bursting') {
+                            //const t = (now - this.burstStart) / 1000
+                            step = 0.20
+                            this.scaleAmount += 0.001
+
+                            // exponential outward push
+                            item.radius *= 1.19 //+ (index * 0.01)
+
+                            // slight angular acceleration
+                            //item.angle += 0.03 + (index * 0.002)
+
+                            destinationX += Math.cos(item.angle) * item.radius
+                            destinationY += Math.sin(item.angle) * item.radius
+
+                            // reset after they fly far enough
+                            if (item.radius > 3000) {
+                                item.radius = 200
+                                //item.angle = index * ((Math.PI * 2) / this.blocks.length)
+
+                                this.scaleAmount = 1
+                                this.state = 'orbiting'
+                            }
+                        }
+
+                        item.x += (destinationX - item.x) * step;
+                        item.y += (destinationY - item.y) * step;
+
+
+                    })
+
+
+                    requestAnimationFrame(() => this.animate());
+
+                },
+
+                updateLocation(e){
+
+                    this.targetX = e.clientX
+                    this.targetY = e.clientY
+                    this.lastMove = Date.now()
+                    this.blocks.forEach((block) => {
+                        block.radius = 0
+                    })
+                    this.state = 'moving'
+                },
+
+                setStarburst(){
+                    this.state = 'collapsing'
+                    this.starburst = true
+                }
+
+            }))
+
+
+        })
+
+    </script>
+    
+</body>
+</html>
