@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <title>Fireworks</title>
+</head>
+<body class="h-dvh w-full bg-zinc-50 flex items-center justify-center">
+
+    <div x-data="fireworks">
+
+        <canvas x-ref="canvas" width="600" height="400">
+
+
+
+
+        </canvas>
+
+
+    </div>
+
+    <script>
+
+        document.addEventListener('alpine:init', () =>{
+
+            Alpine.data('fireworks', () => ({
+
+                canvas: null,
+                ctx: null,
+                missiles: [],
+                step: 60,
+                accumulator: null,
+                lastTime: null,
+                inputs: new Map(),
+
+                init(){
+
+                    this.canvas = this.$refs.canvas
+                    this.ctx = this.canvas.getContext('2d')
+
+                    this.setup()
+
+                    this.tick()
+
+                },
+
+                setup(){
+
+                    this.canvas.addEventListener('mouseup', (e) => {
+                        
+                        this.inputs.set('mousedown', e)
+
+                    })
+
+                },
+
+                tick(){
+
+                   if(this.calculateUpdateTime() >= this.step){
+                        this.readInputs()
+                        this.updateGame()
+                        this.accumulator = 0
+                    }
+
+                    this.render()
+
+                    requestAnimationFrame(() => this.tick())
+
+                },
+
+                calculateUpdateTime(){
+
+                    if(!this.lastTime) this.lastTime = Date.now()
+
+                    const now = Date.now()
+                    const delta = now - this.lastTime
+                    
+                    this.accumulator += delta
+                    this.lastTime = now
+
+                    return this.accumulator
+
+                },
+
+                updateGame(){
+
+                    this.missiles.forEach((missile) => {
+                        let theta = missile.angle // * Math.PI / 180
+                        let r = Math.hypot(missile.tx - missile.cx, missile.ty - missile.cy);
+                        
+
+                        // offset is a 0..1 fraction of the radius
+                        let dx = missile.offset * r * Math.cos(theta)
+                        let dy = missile.offset * r * Math.sin(theta)
+
+                        missile.currentX = missile.cx + dx
+                        missile.currentY = missile.cy + dy
+
+                        missile.offset += 0.1
+
+                    })
+
+                    this.missiles = this.missiles.filter(missile => {
+                            const r = Math.hypot(missile.currentX - missile.cx, missile.currentY - missile.cy);
+                            const maxR =  Math.hypot(missile.tx, missile.ty);
+                            return r < maxR
+                    })
+
+                },
+
+                readInputs(){
+
+                    if(this.inputs.has('mousedown')){
+
+                        let e = this.inputs.get('mousedown')
+
+                        let x = e.offsetX
+                        let y = e.offsetY
+
+                        let cx = this.canvas.clientWidth / 2
+                        let cy = this.canvas.clientHeight
+
+                        let tx = x - cx
+                        let ty = y - cy
+
+                        let angle = Math.atan2(ty, tx)
+
+                        this.missiles.push({tx: tx, ty: ty, cx: cx, cy: cy, currentX: cx, currentY: cy, angle: angle, offset: 0})
+
+                        this.inputs.delete('mousedown')
+
+
+                    }
+
+                },
+
+
+                render(){
+
+                    this.ctx.clearRect(0, 0, 600, 400)
+
+                    this.ctx.fillStyle = 'black'
+                    this.ctx.fillRect(0, 0, 600, 400)
+
+                    this.ctx.fillStyle = 'white'
+                    this.missiles.forEach((missile) => {
+
+                        this.ctx.fillRect(missile.currentX, missile.currentY, 5, 5)
+
+
+                    })
+
+                }
+
+
+            }))
+
+        })
+
+
+    </script>
+    
+</body>
+</html>
