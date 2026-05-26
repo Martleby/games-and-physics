@@ -35,9 +35,11 @@
                 ctx: null,
                 missiles: [],
                 step: 60,
-                accumulator: null,
+                accumulator: 0,
                 lastTime: null,
                 inputs: new Map(),
+                alpha: 0,
+                explosions: [],
 
                 init(){
 
@@ -62,54 +64,81 @@
 
                 tick(){
 
-                   if(this.calculateUpdateTime() >= this.step){
-                        this.readInputs()
-                        this.updateGame()
-                        this.accumulator = 0
+                    const needsUpdate = this.calculateUpdateTime() >= this.step
+
+                    if(needsUpdate){
+                            this.accumulator -= this.step
+                            this.readInputs()
+                            this.updateGame()
                     }
 
-                    this.render()
+                    this.alpha = Math.min(this.accumulator / this.step, 1.0)
+
+                    this.render(this.alpha)
 
                     requestAnimationFrame(() => this.tick())
 
                 },
 
                 calculateUpdateTime(){
-
                     if(!this.lastTime) this.lastTime = Date.now()
 
                     const now = Date.now()
-                    const delta = now - this.lastTime
-                    
-                    this.accumulator += delta
+                    this.accumulator += now - this.lastTime
                     this.lastTime = now
 
                     return this.accumulator
-
                 },
 
                 updateGame(){
 
                     this.missiles.forEach((missile) => {
+
+                        missile.previousX = missile.currentX
+                        missile.previousY = missile.currentY
+
+                        //missile.offset += 0.1 //+ Math.random()
+
                         let theta = missile.angle // * Math.PI / 180
-                        let r = Math.hypot(missile.tx - missile.cx, missile.ty - missile.cy);
+                        let r = Math.hypot(missile.tx, missile.ty);
+
+                        missile.velocity += missile.acceleration  // accelerate the offset rate
+                        missile.offset += missile.velocity          
                         
-
                         // offset is a 0..1 fraction of the radius
-                        let dx = missile.offset * r * Math.cos(theta)
-                        let dy = missile.offset * r * Math.sin(theta)
+                        let dx = missile.offset * r * Math.cos(theta) 
+                        let dy = missile.offset * r * Math.sin(theta) 
 
-                        missile.currentX = missile.cx + dx
-                        missile.currentY = missile.cy + dy
+                        missile.currentX = missile.cx + dx 
+                        missile.currentY = missile.cy + dy 
 
-                        missile.offset += 0.1
+                        
 
                     })
 
                     this.missiles = this.missiles.filter(missile => {
                             const r = Math.hypot(missile.currentX - missile.cx, missile.currentY - missile.cy);
                             const maxR =  Math.hypot(missile.tx, missile.ty);
+                            if(r >= maxR){
+                                this.explosions.push({
+                                    x: missile.cx + missile.tx,  // absolute canvas position of target
+                                    y: missile.cy + missile.ty,
+                                    radius: 2,
+                                    maxRadius: 50,
+                                    radiusGrow: 2.5,
+                                    colour: (() => `rgba(${['255,0,0','0,255,0','0,0,255'][Math.floor(Math.random()*3)]},${Math.random().toFixed(2)})`)()
+                                })
+                            }
                             return r < maxR
+                    })
+
+                    this.explosions.forEach((explosion) => {
+                        explosion.previousRadius = explosion.radius
+                        explosion.radius += explosion.radiusGrow
+                    })
+
+                    this.explosions = this.explosions.filter(explosion => {
+                        return explosion.radius < explosion.maxRadius
                     })
 
                 },
@@ -123,15 +152,26 @@
                         let x = e.offsetX
                         let y = e.offsetY
 
-                        let cx = this.canvas.clientWidth / 2
-                        let cy = this.canvas.clientHeight
+                        let cx = this.canvas.clientWidth * .5
+                        let cy = this.canvas.clientHeight * .9
 
                         let tx = x - cx
                         let ty = y - cy
 
                         let angle = Math.atan2(ty, tx)
 
-                        this.missiles.push({tx: tx, ty: ty, cx: cx, cy: cy, currentX: cx, currentY: cy, angle: angle, offset: 0})
+                        this.missiles.push({tx: tx,
+                             ty: ty, 
+                             cx: cx, 
+                             cy: cy, 
+                             currentX: cx, 
+                             currentY: cy, 
+                             previousX: cx, 
+                             previousY: cy, 
+                             angle: angle,
+                             velocity: 0.03,
+                             acceleration: 0.015, 
+                             offset: 0})
 
                         this.inputs.delete('mousedown')
 
@@ -141,17 +181,60 @@
                 },
 
 
-                render(){
+                render(alpha){
 
-                    this.ctx.clearRect(0, 0, 600, 400)
+                    //this.ctx.clearRect(0, 0, 600, 400)
 
-                    this.ctx.fillStyle = 'black'
+                    //this.ctx.fillStyle = 'black'
+                    //this.ctx.fillRect(0, 0, 600, 400)
+
+                    this.ctx.fillStyle = 'rgba(0,0,0,0.2)'
                     this.ctx.fillRect(0, 0, 600, 400)
 
                     this.ctx.fillStyle = 'white'
                     this.missiles.forEach((missile) => {
 
-                        this.ctx.fillRect(missile.currentX, missile.currentY, 5, 5)
+                        // THE LERP: prev + (current - prev) * alpha
+
+                        // console.log({
+                        //     alpha,
+                        //     prevX: missile.previousX,
+                        //     currX: missile.currentX,
+                        //     renderX: missile.previousX + (missile.currentX - missile.previousX) * alpha
+                        // })
+
+                        const renderX = missile.previousX + (missile.currentX - missile.previousX) * alpha
+                        const renderY = missile.previousY + (missile.currentY - missile.previousY) * alpha
+                                                        
+                        // Draw at the interpolated position
+                        this.ctx.fillRect(renderX, renderY, 5, 5)
+
+                        //debug
+                        //this.ctx.fillStyle = 'red'
+                        //this.ctx.fillRect(missile.previousX, missile.previousY, 8, 8)
+                        //this.ctx.fillStyle = 'blue'
+                        //this.ctx.fillRect(missile.currentX, missile.currentY, 8, 8)
+                        //this.ctx.fillStyle = 'pink'
+
+                    })
+
+                    this.explosions.forEach((explosion) => {
+
+                        this.ctx.beginPath();
+
+                        this.ctx.fillStyle = (() => `rgba(${['255,0,0','0,255,0','0,0,255'][Math.floor(Math.random()*3)]},${Math.random().toFixed(2)})`)()
+                    
+                        
+                        this.ctx.arc(
+                            explosion.x, 
+                            explosion.y, 
+                            explosion.previousRadius + (explosion.radius - explosion.previousRadius) * alpha, 
+                            0, 
+                            2 * Math.PI
+                        )
+
+                        this.ctx.fill()
+                        this.ctx.closePath()
 
 
                     })
