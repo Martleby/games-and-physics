@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <title>Missile Command</title>
+</head>
+<body class="h-dvh w-full bg-zinc-50 flex items-center justify-center bg-center bg-cover bg-[url(/img/missile-command.png)]">
+
+    <div x-data="fireworks">
+
+        <canvas x-ref="canvas" width="600" height="400">
+
+
+
+
+        </canvas>
+
+
+    </div>
+
+    <script>
+
+        document.addEventListener('alpine:init', () =>{
+
+            Alpine.data('fireworks', () => ({
+
+                canvas: null,
+                ctx: null,
+                missiles: [],
+                step: 60,
+                accumulator: 0,
+                lastTime: null,
+                inputs: new Map(),
+                alpha: 0,
+                explosions: [],
+                bases:[
+
+                    {number: 1, health: 100, missileStock: 10},
+                    {number: 2, health: 100, missileStock: 10},
+                    {number: 3, health: 100, missileStock: 10},
+                    {number: 4, health: 100, missileStock: 10},
+                    {number: 5, health: 100, missileStock: 10}
+
+                ],
+                enemies: [
+                    {x: Math.random() * 600, y: 100, tx: Math.random() * 600, ty: 425, previousX: 100, previousY:100, hit: false},
+                    {x: Math.random() * 600, y: 100, tx: Math.random() * 600, ty: 425, previousX: 100, previousY:100, hit: false},
+                    {x: Math.random() * 600, y: 100, tx: Math.random() * 600, ty: 425, previousX: 100, previousY:100, hit: false},
+                    {x: Math.random() * 600, y: 100, tx: Math.random() * 600, ty: 425, previousX: 100, previousY:100, hit: false},
+                    {x: Math.random() * 600, y: 100, tx: Math.random() * 600, ty: 425, previousX: 100, previousY:100, hit: false},
+                    {x: Math.random() * 600, y: 100, tx: Math.random() * 600, ty: 425, previousX: 100, previousY:100, hit: false},
+
+                ],
+
+                init(){
+
+                    this.canvas = this.$refs.canvas
+                    this.ctx = this.canvas.getContext('2d')
+
+                    this.setup()
+
+                    this.initBases()
+
+                    this.tick()
+
+                },
+
+                setup(){
+
+                    this.canvas.addEventListener('mouseup', (e) => {
+                        
+                        if(this.missiles.length === 0 /*&& this.explosions.length === 0*/){
+                            this.inputs.set('mousedown', e)
+                        }
+
+                    })
+
+                    
+
+                },
+
+                initBases(){
+
+                    this.bases.forEach(base => {
+
+                        let canvasWidth = this.$refs.canvas.width
+                        let quadrant = base.number * (1 / this.bases.length)
+                        let width = canvasWidth * quadrant
+
+                        let currentLeft = (base.number - 1) * (1 / this.bases.length) * canvasWidth
+
+                        base.x = (currentLeft + width) / 2 - 25
+                        base.y = 375
+                        base.width = 50
+                        base.height = 25
+
+                    })
+                    
+
+                },
+
+                tick(){
+
+                    const needsUpdate = this.calculateUpdateTime() >= this.step
+
+                    if(needsUpdate){
+                            this.accumulator -= this.step
+                            this.readInputs()
+                            this.updateGame()
+                    }
+
+                    this.alpha = Math.min(this.accumulator / this.step, 1.0)
+
+                    this.render(this.alpha)
+
+                    requestAnimationFrame(() => this.tick())
+
+                },
+
+                calculateUpdateTime(){
+                    if(!this.lastTime) this.lastTime = Date.now()
+
+                    const now = Date.now()
+                    this.accumulator += now - this.lastTime
+                    this.lastTime = now
+
+                    return this.accumulator
+                },
+
+                updateGame(){
+
+                    this.missiles.forEach((missile) => {
+
+                        missile.previousX = missile.currentX
+                        missile.previousY = missile.currentY
+
+                        let theta = missile.angle 
+                        let r = Math.hypot(missile.tx, missile.ty);
+
+                        missile.velocity += missile.acceleration  // accelerate the offset rate
+                        missile.offset += missile.velocity          
+                        
+                        let dx = missile.offset * r * Math.cos(theta) 
+                        let dy = missile.offset * r * Math.sin(theta) 
+
+                        missile.currentX = missile.cx + dx 
+                        missile.currentY = missile.cy + dy 
+
+                        
+
+                    })
+
+                    this.missiles = this.missiles.filter(missile => {
+                            const r = Math.hypot(missile.currentX - missile.cx, missile.currentY - missile.cy);
+                            const maxR =  Math.hypot(missile.tx, missile.ty);
+                            if(r >= maxR){
+                                this.explosions.push({
+                                    x: missile.cx + missile.tx,  // absolute canvas position of target
+                                    y: missile.cy + missile.ty,
+                                    radius: 2,
+                                    maxRadius: 50,
+                                    radiusGrow: 2.5,
+                                    colour: (() => `rgba(${['255,0,0','0,255,0','0,0,255'][Math.floor(Math.random()*3)]},${Math.random().toFixed(2)})`)()
+                                })
+                            }
+                            return r < maxR
+                    })
+
+                    this.explosions.forEach((explosion) => {
+                        explosion.previousRadius = explosion.radius
+                        explosion.radius += explosion.radiusGrow
+                    })
+
+                    this.explosions = this.explosions.filter(explosion => {
+                        return explosion.radius < explosion.maxRadius
+                    })
+
+                    this.bases = this.bases.filter(base => base.health > 0)
+
+                    this.enemies.forEach(enemy => {
+                        enemy.previousX = enemy.x
+                        enemy.previousY = enemy.y
+                        
+                        const dx = enemy.tx - enemy.x
+                        const dy = enemy.ty - enemy.y
+
+                        const distance = Math.sqrt(dx * dx + dy * dy)
+
+                        const nx = dx / distance // normalized x ≈ 0.5547
+                        const ny = dy / distance // normalized y ≈ 0.8321
+                        
+                        enemy.x += nx * 5
+                        enemy.y += ny * 5
+                    })
+
+                    //Check for enemy collision with explosion
+                    this.enemies.forEach(enemy => {
+
+                        this.explosions.forEach(explosion => {
+
+                            const dx = enemy.x - explosion.x;
+                            const dy = enemy.y - explosion.y;
+                            const distSq = dx * dx + dy * dy;
+                            
+                            if(distSq <= explosion.radius * explosion.radius){
+                                enemy.hit = true
+                            }
+                            
+                        })
+                    })
+
+                    this.enemies = this.enemies.filter(e => e.y <= e.ty && e.hit === false)
+
+                },
+
+                readInputs(){
+
+                    if(this.inputs.has('mousedown')){
+
+                        let e = this.inputs.get('mousedown')
+
+                        let x = e.offsetX
+                        let y = e.offsetY
+
+                        let cx = this.canvas.clientWidth * .5
+                        let cy = this.canvas.clientHeight * .9
+
+                        let tx = x - cx
+                        let ty = y - cy
+
+                        let angle = Math.atan2(ty, tx)
+
+                        this.missiles.push({
+                             tx: tx,
+                             ty: ty, 
+                             cx: cx, 
+                             cy: cy, 
+                             currentX: cx, 
+                             currentY: cy, 
+                             previousX: cx, 
+                             previousY: cy, 
+                             angle: angle,
+                             velocity: 0.03,
+                             acceleration: 0.015, 
+                             offset: 0
+                        })
+
+                        this.inputs.delete('mousedown')
+
+
+                    }
+
+                },
+
+
+                render(alpha){
+
+                    this.ctx.fillStyle = 'rgba(0,0,0,0.2)'
+                    this.ctx.fillRect(0, 0, 600, 400)
+
+                    this.ctx.fillStyle = 'white'
+                    this.missiles.forEach((missile) => {
+
+                        const renderX = missile.previousX + (missile.currentX - missile.previousX) * alpha
+                        const renderY = missile.previousY + (missile.currentY - missile.previousY) * alpha
+                                                        
+                        // Draw at the interpolated position
+                        this.ctx.fillRect(renderX, renderY, 5, 5)
+
+
+                    })
+
+                    this.explosions.forEach((explosion) => {
+
+                        this.ctx.beginPath();
+
+                        this.ctx.fillStyle = (() => `rgba(${['255,0,0','0,255,0','0,0,255'][Math.floor(Math.random()*3)]},${Math.random().toFixed(2)})`)()
+                    
+                        this.ctx.arc(
+                            explosion.x, 
+                            explosion.y, 
+                            explosion.previousRadius + (explosion.radius - explosion.previousRadius) * alpha, 
+                            0, 
+                            2 * Math.PI
+                        )
+
+                        this.ctx.fill()
+                        this.ctx.closePath()
+
+                    })
+
+                    this.bases.forEach((base, index) => {
+
+                        this.ctx.fillStyle = 'green'
+                        this.ctx.fillRect(base.x, base.y, base.width, base.height)
+
+                    })
+
+                    this.enemies.forEach(enemy => {
+
+                        const renderX = enemy.previousX + (enemy.x - enemy.previousX) * alpha
+                        const renderY = enemy.previousY + (enemy.y - enemy.previousY) * alpha
+
+                        this.ctx.fillStyle = 'yellow'
+                        this.ctx.fillRect(renderX, renderY, 5, 5)
+
+                    })
+
+                
+                }
+
+
+            }))
+
+        })
+
+
+    </script>
+    
+</body>
+</html>
